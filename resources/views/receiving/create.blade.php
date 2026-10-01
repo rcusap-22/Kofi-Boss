@@ -1,0 +1,14 @@
+@extends('layouts.app')
+@section('title', 'Receive Delivery')
+@section('content')
+@php $receivedTotals=$purchase->receiving->flatMap->items->groupBy('item_id')->map(fn($rows)=>$rows->sum('qty_received')); @endphp
+<div class="mb-6"><h2 class="page-heading">Receive Delivery</h2><p class="page-subheading">Purchase #{{ $purchase->id }} · {{ $purchase->supplier->name }}. A complete delivery only needs one confirmation.</p></div>
+<form method="POST" action="{{ route('receiving.store',$purchase) }}" class="max-w-5xl">@csrf
+<section class="ui-card p-5 sm:p-6"><label class="ui-label">Date Received</label><input type="date" name="received_date" value="{{ now()->format('Y-m-d') }}" required class="ui-input max-w-sm"></section>
+<section class="ui-card mt-5 p-4 sm:p-5"><div class="mb-4"><h3 class="font-bold text-lg">Check Physical Delivery</h3><p class="text-sm text-stone-500">Remaining quantities are pre-filled. Change only what did not arrive.</p></div><div class="grid md:grid-cols-2 gap-3">
+@foreach($purchase->items as $i=>$line) @php $already=(int)($receivedTotals[$line->item_id]??0); $remaining=max(0,$line->quantity-$already); @endphp
+@if($remaining>0)<div class="rounded-xl border border-stone-200 bg-stone-50 p-4"><div class="font-bold text-lg">{{ $line->item->name }}</div><div class="text-sm text-stone-500 mt-1">{{ $line->item->purchase_unit ?: ucfirst($line->item->unit) }}</div><div class="grid grid-cols-3 gap-2 mt-4 text-center"><div class="rounded-lg bg-white p-2"><div class="text-xs text-stone-500">Ordered</div><strong>{{ $line->quantity }}</strong></div><div class="rounded-lg bg-white p-2"><div class="text-xs text-stone-500">Received</div><strong>{{ $already }}</strong></div><div class="rounded-lg bg-white p-2"><div class="text-xs text-stone-500">Remaining</div><strong>{{ $remaining }}</strong></div></div><input type="hidden" name="items[{{ $i }}][item_id]" value="{{ $line->item_id }}"><label class="ui-label mt-4">Received Now</label><div class="flex items-center gap-2"><input type="number" name="items[{{ $i }}][qty_received]" value="{{ $remaining }}" min="0" max="{{ $remaining }}" inputmode="numeric" class="ui-input text-center text-xl font-bold"><span class="text-sm font-semibold min-w-24">{{ $line->item->unit }}</span></div></div>@endif
+@endforeach</div></section>
+<section class="ui-card mt-5 p-5 sm:p-6"><label class="ui-label">Delivery Notes <span class="font-normal text-stone-400">(optional)</span></label><textarea name="notes" rows="3" class="ui-input" placeholder="Shortage, damaged package, delivery reference, etc."></textarea></section>
+<div class="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-3"><a href="{{ route('purchases.index') }}" class="ui-btn ui-btn-secondary w-full sm:w-auto">Cancel</a><button class="ui-btn ui-btn-primary w-full sm:w-auto min-h-14 px-8">Confirm Receiving</button></div></form>
+@endsection
