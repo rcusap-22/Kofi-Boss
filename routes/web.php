@@ -33,16 +33,16 @@ Route::middleware(['auth', 'role:inventory_staff'])->group(function () {
 });
 
 Route::middleware(['auth', 'role:inventory_staff,store_manager'])->group(function () {
-    Route::get('/purchases/create', [PurchaseController::class, 'create'])->name('purchases.create');
-    Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
-});
-
-Route::middleware(['auth', 'role:store_manager'])->group(function () {
     Route::get('/inventory/create', [InventoryItemController::class, 'create'])->name('inventory.create');
     Route::post('/inventory', [InventoryItemController::class, 'store'])->name('inventory.store');
     Route::get('/inventory/{item}/edit', [InventoryItemController::class, 'edit'])->name('inventory.edit');
     Route::put('/inventory/{item}', [InventoryItemController::class, 'update'])->name('inventory.update');
     Route::delete('/inventory/{item}', [InventoryItemController::class, 'destroy'])->name('inventory.destroy');
+    Route::get('/purchases/create', [PurchaseController::class, 'create'])->name('purchases.create');
+    Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
+});
+
+Route::middleware(['auth', 'role:store_manager'])->group(function () {
     Route::post('/purchases/{purchase}/approve', [PurchaseController::class, 'approve'])->name('purchases.approve');
     Route::post('/purchases/{purchase}/reject', [PurchaseController::class, 'reject'])->name('purchases.reject');
 });

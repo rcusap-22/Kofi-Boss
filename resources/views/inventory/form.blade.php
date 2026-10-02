@@ -24,11 +24,12 @@
 
             <div>
                 <label class="ui-label">Unit</label>
-                <select name="unit" required class="ui-input">
+                <input type="text" name="unit" value="{{ old('unit', $item->unit) }}" required class="ui-input" list="inventory-units" placeholder="e.g. carton, bottle, bag, pcs">
+                <datalist id="inventory-units">
                     @foreach(['carton','bottle','bag','pouch','can','tub','pack','pcs'] as $unit)
-                        <option value="{{ $unit }}" @selected(old('unit', $item->unit) === $unit)>{{ ucfirst($unit) }}</option>
+                        <option value="{{ $unit }}"></option>
                     @endforeach
-                </select>
+                </datalist>
             </div>
 
             <div>
