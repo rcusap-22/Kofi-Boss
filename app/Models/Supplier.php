@@ -11,6 +11,11 @@ class Supplier extends Model
 
     protected $fillable = ['name', 'contact_person', 'phone', 'email', 'address'];
 
+    public static function ensureMainSupplier(): self
+    {
+        return static::firstOrCreate(['name' => 'Main Supplier']);
+    }
+
     public function items()
     {
         return $this->hasMany(InventoryItem::class);

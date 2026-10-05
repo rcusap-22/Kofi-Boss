@@ -20,7 +20,10 @@ class PurchaseController extends Controller
 
     public function create(Request $request)
     {
-        $suppliers = Supplier::orderBy('name')->get();
+        Supplier::ensureMainSupplier();
+        $suppliers = Supplier::orderByRaw("CASE WHEN name = 'Main Supplier' THEN 0 ELSE 1 END")
+            ->orderBy('name')
+            ->get();
         $items = InventoryItem::orderBy('name')->get();
         $preselectedItemId = $request->integer('item');
         $preselectedSupplierId = $preselectedItemId ? InventoryItem::whereKey($preselectedItemId)->value('supplier_id') : null;

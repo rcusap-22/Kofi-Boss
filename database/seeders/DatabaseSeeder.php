@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Models\Supplier;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -10,6 +11,8 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        Supplier::ensureMainSupplier();
+
         User::updateOrCreate(
             ['username' => 'owner'],
             ['name' => 'Admin Owner', 'email' => 'owner@kofiboss.test', 'password' => Hash::make('password'), 'role' => 'owner']

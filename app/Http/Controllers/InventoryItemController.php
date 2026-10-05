@@ -22,7 +22,10 @@ class InventoryItemController extends Controller
 
     public function create()
     {
-        $suppliers = Supplier::orderBy('name')->get();
+        Supplier::ensureMainSupplier();
+        $suppliers = Supplier::orderByRaw("CASE WHEN name = 'Main Supplier' THEN 0 ELSE 1 END")
+            ->orderBy('name')
+            ->get();
         return view('inventory.form', ['item' => new InventoryItem, 'suppliers' => $suppliers]);
     }
 
@@ -52,7 +55,10 @@ class InventoryItemController extends Controller
 
     public function edit(InventoryItem $item)
     {
-        $suppliers = Supplier::orderBy('name')->get();
+        Supplier::ensureMainSupplier();
+        $suppliers = Supplier::orderByRaw("CASE WHEN name = 'Main Supplier' THEN 0 ELSE 1 END")
+            ->orderBy('name')
+            ->get();
         return view('inventory.form', compact('item', 'suppliers'));
     }
 
