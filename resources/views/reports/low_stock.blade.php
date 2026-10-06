@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'Low Stock Report')
 @section('content')
-@if(auth()->user()->isOwner())<div class="flex justify-end mb-4 no-print"><button onclick="window.print()" class="ui-btn ui-btn-secondary">Print / Save PDF</button></div>@endif
+<div class="flex justify-end mb-4"><a href="{{ route('reports.export',['report'=>'low-stock']) }}" class="ui-btn ui-btn-secondary">Download Excel</a></div>
     <div class="mb-6">
         <h2 class="page-heading">Low Stock Report</h2>
         <p class="page-subheading">Items that have reached their minimum stock level.</p>

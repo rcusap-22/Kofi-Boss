@@ -8,7 +8,7 @@
             <h2 class="page-heading">Inventory Movement Report</h2>
             <p class="page-subheading">{{ $periodLabel }}</p>
         </div>
-        <button type="button" onclick="window.print()" class="tap rounded-xl bg-green-700 px-4 py-3 text-sm font-semibold text-white hover:bg-green-800 print:hidden">Print / Save PDF</button>
+        <a href="{{ route('reports.export', array_merge(['report'=>'inventory-movement'], request()->only(['period','date','month','from','to']))) }}" class="tap rounded-xl bg-green-700 px-4 py-3 text-sm font-semibold text-white hover:bg-green-800">Download Excel</a>
     </div>
 
     <div class="ui-card p-4 print:hidden">

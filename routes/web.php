@@ -59,6 +59,7 @@ Route::middleware(['auth', 'role:owner,store_manager'])->group(function () {
     Route::get('/reports/transactions', [ReportController::class, 'transactions'])->name('reports.transactions');
     Route::get('/reports/low-stock', [ReportController::class, 'lowStock'])->name('reports.lowstock');
     Route::get('/reports/purchases', [ReportController::class, 'purchases'])->name('reports.purchases');
+    Route::get('/reports/export/{report}', [ReportController::class, 'exportExcel'])->name('reports.export');
 });
 
 Route::middleware(['auth', 'role:owner'])->group(function () {
