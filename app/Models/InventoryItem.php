@@ -4,8 +4,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 class InventoryItem extends Model {
     use HasFactory;
-    protected $fillable = ['name','category','unit','purchase_unit','purchase_unit_size','stock_qty','min_stock','expiry_date','supplier_id','status'];
-    protected function casts(): array { return ['expiry_date'=>'date','stock_qty'=>'integer','min_stock'=>'integer']; }
+    protected $fillable = ['name','category','unit','purchase_unit','purchase_unit_size','stock_qty','min_stock','expiry_date','supplier_id','status','archived_at'];
+    protected function casts(): array { return ['expiry_date'=>'date','stock_qty'=>'integer','min_stock'=>'integer','archived_at'=>'datetime']; }
+    public function scopeActive($query){ return $query->whereNull('archived_at'); }
     public function supplier(){ return $this->belongsTo(Supplier::class); }
     public function stockTransactions(){ return $this->hasMany(StockTransaction::class,'item_id'); }
     public function isLowStock(): bool { return $this->stock_qty <= $this->min_stock; }

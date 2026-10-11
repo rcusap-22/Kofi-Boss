@@ -9,9 +9,9 @@ class LowStockController extends Controller
 {
     public function index()
     {
-        $items = InventoryItem::whereIn('status', ['low_stock', 'out_of_stock'])
+        $items = InventoryItem::active()->whereIn('status', ['low_stock', 'out_of_stock'])
             ->orderBy('stock_qty')
-            ->get();
+            ->paginate(10)->withQueryString();
 
         return view('stock.low', compact('items'));
     }

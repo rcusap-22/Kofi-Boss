@@ -49,4 +49,7 @@
             @endforeach
         </div>
     @endif
+    @if($items->hasPages())
+        <div class="mt-5">{{ $items->links() }}</div>
+    @endif
 @endsection

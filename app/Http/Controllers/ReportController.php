@@ -7,22 +7,41 @@ use App\Models\Purchase;
 use App\Models\StockTransaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class ReportController extends Controller
 {
     public function index() { return view('reports.index'); }
 
+    private function pageRows($rows, Request $request): LengthAwarePaginator
+    {
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $collection = collect($rows)->values();
+        return (new LengthAwarePaginator($collection->forPage($page, 10)->values(), $collection->count(), 10, $page,
+            ['path' => $request->url(), 'query' => $request->query()]));
+    }
+
+
     public function dailyInventory(Request $request)
     {
         $date = $request->input('date', now()->toDateString());
-        $count = DailyStockCount::with(['items.item','user'])->whereDate('count_date', $date)->first();
-        return view('reports.daily_inventory', compact('count','date'));
+        $count = DailyStockCount::with(['items.item','user'])->whereDate('count_date', $date)->where('review_status', '!=', 'canceled')->latest('id')->first();
+        $canceledCount = !$count && DailyStockCount::whereDate('count_date', $date)->where('review_status', 'canceled')->exists();
+        $search = trim((string) $request->query('search', ''));
+        $countItems = $count ? $count->items->filter(fn($row) => str_contains(mb_strtolower($row->item?->name ?? ''), mb_strtolower($search))) : collect();
+        $countItems = $this->pageRows($countItems, $request);
+        return view('reports.daily_inventory', compact('count','date','canceledCount','countItems','search'));
     }
 
-    public function stockSummary()
+    public function stockSummary(Request $request)
     {
-        $items = InventoryItem::orderBy('category')->orderBy('name')->get();
-        return view('reports.stock_summary', compact('items'));
+        $items = InventoryItem::active()->orderBy('category')->orderBy('name')->get();
+        $search = trim((string) $request->query('search',''));
+        $status = $request->query('status','all');
+        $items = $items->filter(fn($item) => ($search === '' || str_contains(mb_strtolower($item->name),mb_strtolower($search)))
+            && ($status === 'all' || $item->status === $status));
+        $items = $this->pageRows($items, $request);
+        return view('reports.stock_summary', compact('items','search','status'));
     }
 
     public function inventoryMovement(Request $request)
@@ -37,7 +56,7 @@ class ReportController extends Controller
         } else {
             $period='daily'; $date=$request->input('date',now()->toDateString()); $start=Carbon::parse($date)->startOfDay(); $end=$start->copy()->endOfDay(); $periodLabel=$start->format('F j, Y');
         }
-        $items=InventoryItem::orderBy('category')->orderBy('name')->get();
+        $items=InventoryItem::active()->orderBy('category')->orderBy('name')->get();
         $periodTransactions=StockTransaction::whereBetween('date',[$start->toDateString(),$end->toDateString()])->get()->groupBy('item_id');
         $afterTransactions=StockTransaction::where('date','>',$end->toDateString())->get()->groupBy('item_id');
         $rows=$items->map(function($item) use($periodTransactions,$afterTransactions){
@@ -55,20 +74,37 @@ class ReportController extends Controller
             return (object)['name'=>$item->name,'category'=>$item->category,'unit'=>$item->unit,'beginning_stock'=>$beginning,'received_stock'=>$received,'reconciliation_in'=>$reconIn,'reconciliation_out'=>$reconOut,'estimated_reduction'=>$estimatedReduction,'ending_stock'=>$ending,'status'=>$status];
         });
         $totals=(object)['received_stock'=>$rows->sum('received_stock'),'reconciliation_in'=>$rows->sum('reconciliation_in'),'reconciliation_out'=>$rows->sum('reconciliation_out')];
-        return view('reports.inventory_movement',compact('rows','totals','period','periodLabel','start','end'));
+        $search = trim((string) $request->query('search',''));
+        $status = $request->query('status','all');
+        $rows = $rows->filter(fn($row) => ($search === '' || str_contains(mb_strtolower($row->name),mb_strtolower($search)))
+            && ($status === 'all' || $row->status === $status));
+        $rows = $this->pageRows($rows, $request);
+        return view('reports.inventory_movement',compact('rows','totals','period','periodLabel','start','end','search','status'));
     }
 
     public function transactions(Request $request)
     {
         $from=$request->date('from')??now()->subDays(30); $to=$request->date('to')??now();
-        $transactions=StockTransaction::with(['item','user'])->whereBetween('date',[$from,$to])->orderByDesc('date')->get();
+        $query=StockTransaction::with(['item','user'])->whereBetween('date',[$from,$to]);
+        if (in_array($request->query('type'), ['in','out'], true)) $query->where('type', $request->query('type'));
+        if ($request->filled('search')) $query->whereHas('item', fn($q) => $q->where('name','like','%'.$request->query('search').'%'));
+        $transactions=$query->orderByDesc('date')->paginate(10)->withQueryString();
         return view('reports.transactions',compact('transactions','from','to'));
     }
-    public function lowStock(){ $items=InventoryItem::whereIn('status',['low_stock','out_of_stock'])->get(); return view('reports.low_stock',compact('items')); }
+    public function lowStock(Request $request){
+        $query=InventoryItem::active()->whereIn('status',['low_stock','out_of_stock']);
+        if ($request->filled('search')) $query->where('name','like','%'.$request->query('search').'%');
+        if (in_array($request->query('status'),['low_stock','out_of_stock'],true)) $query->where('status',$request->query('status'));
+        $items=$query->orderBy('name')->paginate(10)->withQueryString();
+        return view('reports.low_stock',compact('items'));
+    }
     public function purchases(Request $request)
     {
         $from=$request->date('from')??now()->subDays(90); $to=$request->date('to')??now();
-        $purchases=Purchase::with(['supplier','requestedBy','approvedBy'])->whereBetween('order_date',[$from,$to])->orderByDesc('order_date')->get();
+        $query=Purchase::with(['supplier','requestedBy','approvedBy'])->whereBetween('order_date',[$from,$to]);
+        if (in_array($request->query('status'),['pending','approved','rejected','completed','received','partially_received'],true)) $query->where('status',$request->query('status'));
+        if ($request->filled('search')) $query->whereHas('supplier',fn($q) => $q->where('name','like','%'.$request->query('search').'%'));
+        $purchases=$query->orderByDesc('order_date')->paginate(10)->withQueryString();
         return view('reports.purchases',compact('purchases','from','to'));
     }
 
@@ -82,22 +118,22 @@ class ReportController extends Controller
         switch ($report) {
             case 'daily-inventory':
                 $date = $request->input('date', now()->toDateString());
-                $count = DailyStockCount::with(['items.item','user'])->whereDate('count_date', $date)->first();
+                $count = DailyStockCount::with(['items.item','user'])->whereDate('count_date', $date)->where('review_status', '!=', 'canceled')->latest('id')->first();
                 $title = 'Daily Inventory Report - ' . Carbon::parse($date)->format('F j, Y');
-                $headers = ['Item', 'Unit', 'Expected', 'Actual', 'Variance'];
+                $headers = ['Item', 'Unit', 'Start of Day', 'End of Day', 'Variance'];
                 if ($count) {
-                    foreach ($count->items as $row) {
-                        $rows[] = [$row->item->name, $row->item->unit, (int)$row->expected_qty, (int)$row->actual_qty, (int)$row->variance_qty];
+                    foreach ($count->items->filter(fn($row) => !$request->filled('search') || str_contains(mb_strtolower($row->item?->name ?? ''), mb_strtolower($request->query('search')))) as $row) {
+                        $rows[] = [$row->item->name, $row->item->unit, (int)$row->expected_qty, (int)$row->actual_qty, abs((int)$row->variance_qty)];
                     }
                 }
                 $filename = 'daily-inventory-' . $date . '.xlsx';
                 break;
 
             case 'stock-summary':
-                $items = InventoryItem::orderBy('category')->orderBy('name')->get();
+                $items = InventoryItem::active()->orderBy('category')->orderBy('name')->get();
                 $title = 'Stock Summary';
                 $headers = ['Item', 'Category', 'Quantity', 'Unit', 'Reorder Threshold', 'Status'];
-                foreach ($items as $item) {
+                foreach ($items->filter(fn($item) => (!$request->filled('search') || str_contains(mb_strtolower($item->name),mb_strtolower($request->query('search')))) && (!in_array($request->query('status'), ['in_stock','low_stock','out_of_stock'],true) || $item->status === $request->query('status'))) as $item) {
                     $rows[] = [$item->name, $item->category, (int)$item->stock_qty, $item->unit, (int)$item->min_stock, str_replace('_', ' ', ucfirst($item->status))];
                 }
                 $filename = 'stock-summary-' . now()->format('Y-m-d') . '.xlsx';
@@ -107,7 +143,7 @@ class ReportController extends Controller
                 [$rowsData, $periodLabel] = $this->movementRowsForExport($request);
                 $title = 'Inventory Movement Report - ' . $periodLabel;
                 $headers = ['Item', 'Category', 'Unit', 'Beginning Stock', 'Received', 'Count Increase', 'Count Reduction', 'Ending Stock', 'Status'];
-                foreach ($rowsData as $row) {
+                foreach ($rowsData->filter(fn($row) => (!$request->filled('search') || str_contains(mb_strtolower($row->name),mb_strtolower($request->query('search')))) && (!in_array($request->query('status'),['In Stock','Low Stock','Out of Stock'],true) || $row->status === $request->query('status'))) as $row) {
                     $rows[] = [$row->name, $row->category, $row->unit, (int)$row->beginning_stock, (int)$row->received_stock, (int)$row->reconciliation_in, (int)$row->reconciliation_out, (int)$row->ending_stock, $row->status];
                 }
                 $filename = 'inventory-movement-' . now()->format('Y-m-d') . '.xlsx';
@@ -116,7 +152,10 @@ class ReportController extends Controller
             case 'transactions':
                 $from = $request->date('from') ?? now()->subDays(30);
                 $to = $request->date('to') ?? now();
-                $transactions = StockTransaction::with(['item','user'])->whereBetween('date', [$from, $to])->orderByDesc('date')->get();
+                $txQuery = StockTransaction::with(['item','user'])->whereBetween('date', [$from, $to]);
+                if (in_array($request->query('type'), ['in','out'],true)) $txQuery->where('type',$request->query('type'));
+                if ($request->filled('search')) $txQuery->whereHas('item',fn($q) => $q->where('name','like','%'.$request->query('search').'%'));
+                $transactions = $txQuery->orderByDesc('date')->get();
                 $title = 'Transaction Report - ' . $from->format('M j, Y') . ' to ' . $to->format('M j, Y');
                 $headers = ['Date', 'Item', 'Type', 'Quantity', 'Unit', 'Recorded By', 'Reference'];
                 foreach ($transactions as $tx) {
@@ -126,10 +165,10 @@ class ReportController extends Controller
                 break;
 
             case 'low-stock':
-                $items = InventoryItem::whereIn('status', ['low_stock','out_of_stock'])->orderBy('name')->get();
+                $items = InventoryItem::active()->whereIn('status', ['low_stock','out_of_stock'])->orderBy('name')->get();
                 $title = 'Low Stock Report';
                 $headers = ['Item', 'Category', 'Current Stock', 'Unit', 'Minimum', 'Status'];
-                foreach ($items as $item) {
+                foreach ($items->filter(fn($item) => (!$request->filled('search') || str_contains(mb_strtolower($item->name),mb_strtolower($request->query('search')))) && (!in_array($request->query('status'),['low_stock','out_of_stock'],true) || $item->status === $request->query('status'))) as $item) {
                     $rows[] = [$item->name, $item->category, (int)$item->stock_qty, $item->unit, (int)$item->min_stock, str_replace('_', ' ', ucfirst($item->status))];
                 }
                 $filename = 'low-stock-' . now()->format('Y-m-d') . '.xlsx';
@@ -138,7 +177,10 @@ class ReportController extends Controller
             case 'purchases':
                 $from = $request->date('from') ?? now()->subDays(90);
                 $to = $request->date('to') ?? now();
-                $purchases = Purchase::with(['supplier','requestedBy','approvedBy'])->whereBetween('order_date', [$from, $to])->orderByDesc('order_date')->get();
+                $purchaseQuery = Purchase::with(['supplier','requestedBy','approvedBy'])->whereBetween('order_date', [$from, $to]);
+                if (in_array($request->query('status'),['pending','approved','rejected','completed','received','partially_received'],true)) $purchaseQuery->where('status',$request->query('status'));
+                if ($request->filled('search')) $purchaseQuery->whereHas('supplier',fn($q) => $q->where('name','like','%'.$request->query('search').'%'));
+                $purchases = $purchaseQuery->orderByDesc('order_date')->get();
                 $title = 'Purchase Report - ' . $from->format('M j, Y') . ' to ' . $to->format('M j, Y');
                 $headers = ['Date', 'Supplier', 'Requested By', 'Approved By', 'Status'];
                 foreach ($purchases as $purchase) {
@@ -173,7 +215,7 @@ class ReportController extends Controller
             $periodLabel = $start->format('F j, Y');
         }
 
-        $items = InventoryItem::orderBy('category')->orderBy('name')->get();
+        $items = InventoryItem::active()->orderBy('category')->orderBy('name')->get();
         $periodTransactions = StockTransaction::whereBetween('date', [$start->toDateString(), $end->toDateString()])->get()->groupBy('item_id');
         $afterTransactions = StockTransaction::where('date', '>', $end->toDateString())->get()->groupBy('item_id');
         $rows = $items->map(function ($item) use ($periodTransactions, $afterTransactions) {

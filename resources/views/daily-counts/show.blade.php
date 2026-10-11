@@ -1,3 +1,4 @@
 @extends('layouts.app')
 @section('title','Closing Inventory')
-@section('content')<div class="max-w-6xl mx-auto"><div class="mb-5"><h2 class="page-heading">Closing Inventory</h2><p class="page-subheading">Historical daily counts are locked and read-only.</p></div>@include('daily-counts._readonly',['dailyCount'=>$dailyCount])</div>@endsection
+@section('content')<div class="max-w-6xl mx-auto"><div class="mb-5"><a href="{{ request()->query('from') === 'requests' ? route('daily-counts.requests.index') : route('daily-counts.index') }}" class="ui-btn ui-btn-secondary inline-flex items-center justify-center mb-4">Back</a><h2 class="page-heading">Closing Inventory</h2><p class="page-subheading">Historical daily counts are locked and read-only.</p></div>@include('daily-counts._readonly',['dailyCount'=>$dailyCount])
+@include('daily-counts._request_actions',['dailyCount'=>$dailyCount])</div>@endsection

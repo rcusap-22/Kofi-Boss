@@ -29,4 +29,5 @@
         </div>
     </main>
 </div>
+@include('partials.system_dialog')
 </body></html>

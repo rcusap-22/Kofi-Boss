@@ -8,7 +8,7 @@
             <h2 class="page-heading">Inventory Movement Report</h2>
             <p class="page-subheading">{{ $periodLabel }}</p>
         </div>
-        <a href="{{ route('reports.export', array_merge(['report'=>'inventory-movement'], request()->only(['period','date','month','from','to']))) }}" class="tap rounded-xl bg-green-700 px-4 py-3 text-sm font-semibold text-white hover:bg-green-800">Download Excel</a>
+        <a href="{{ route('reports.export', array_merge(['report'=>'inventory-movement'], request()->only(['period','date','month','from','to','search','status']))) }}" class="tap rounded-xl bg-green-700 px-4 py-3 text-sm font-semibold text-white hover:bg-green-800">Download Excel</a>
     </div>
 
     <div class="ui-card p-4 print:hidden">
@@ -25,6 +25,7 @@
             <div id="monthlyField"><label class="block text-sm font-semibold mb-1">Month</label><input type="month" name="month" value="{{ request('month', $start->format('Y-m')) }}" class="w-full rounded-xl border border-stone-300 px-3 py-3"></div>
             <div id="fromField"><label class="block text-sm font-semibold mb-1">From</label><input type="date" name="from" value="{{ request('from', $start->toDateString()) }}" class="w-full rounded-xl border border-stone-300 px-3 py-3"></div>
             <div id="toField"><label class="block text-sm font-semibold mb-1">To</label><input type="date" name="to" value="{{ request('to', $end->toDateString()) }}" class="w-full rounded-xl border border-stone-300 px-3 py-3"></div>
+            <label class="flex-1 min-w-48"><span class="ui-label">Search item</span><input class="ui-input w-full" name="search" value="{{ request('search') }}" placeholder="Search item"></label><label><span class="ui-label">Status</span><select class="ui-input" name="status"><option value="all" @selected(request('status','all')==='all')>All statuses</option><option value="In Stock" @selected(request('status','all')==='In Stock')>In Stock</option><option value="Low Stock" @selected(request('status','all')==='Low Stock')>Low Stock</option><option value="Out of Stock" @selected(request('status','all')==='Out of Stock')>Out of Stock</option></select></label>
             <button class="tap rounded-xl bg-green-700 px-4 py-3 font-semibold text-white hover:bg-green-800">Generate Report</button>
         </form>
     </div>
@@ -56,6 +57,10 @@
         </table>
     </div>
 
+<div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+    <p class="text-white" aria-live="polite">Showing {{ $rows->firstItem() ?? 0 }}–{{ $rows->lastItem() ?? 0 }} of {{ $rows->total() }} records</p>
+    {{ $rows->links('reports.pagination') }}
+</div>
     <div class="text-sm text-stone-500">Daily Stock Count is the authoritative closing inventory. Count increases or reductions show the difference between the system's expected quantity and the staff's physical count.</div>
 </div>
 <script>
