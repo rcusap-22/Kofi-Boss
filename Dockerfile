@@ -76,4 +76,4 @@ RUN mkdir -p \
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "php artisan migrate --force && exec apache2-foreground"]
+CMD ["sh", "-c", "php artisan migrate --force && if [ \"$RUN_HOSTED_PRESENTATION_SEED\" = \"yes\" ]; then php artisan db:seed --class=HostedPresentationSeeder --force; fi && exec apache2-foreground"]
